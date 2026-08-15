@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Two vertical strokes of the hash -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,30 L50,30 L50,78 L42,78 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,30 L66,30 L66,78 L58,78 Z" />
+    <!-- Two horizontal strokes of the hash -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,44 L78,44 L78,52 L30,52 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,56 L78,56 L78,64 L30,64 Z" />
+</vector>

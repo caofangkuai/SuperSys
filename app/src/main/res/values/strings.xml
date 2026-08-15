@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SuperSys</string>
+
+    <!-- Bottom navigation -->
+    <string name="tab_home">主页</string>
+    <string name="tab_supersys">超级系统</string>
+    <string name="tab_command">命令执行</string>
+    <string name="tab_log">日志</string>
+
+    <!-- Home -->
+    <string name="home_status_installed">已安装</string>
+    <string name="home_status_not_installed">未安装</string>
+    <string name="home_version_label">版本</string>
+    <string name="home_version_value">v1.0.0</string>
+    <string name="home_install_title">安装 SuperSys</string>
+    <string name="home_install_subtitle">将 SuperSys 安装到您的设备</string>
+    <string name="home_install_btn">安装</string>
+    <string name="home_info_title">设备信息</string>
+    <string name="home_info_android">系统版本</string>
+    <string name="home_info_device">设备型号</string>
+    <string name="home_info_supersys">SuperSys 状态</string>
+    <string name="home_info_supersys_value">运行中</string>
+    <string name="home_info_patch">安全补丁日期</string>
+    <string name="home_info_startanywhere">StartAnyWhere</string>
+    <string name="home_info_startanywhere_yes">支持</string>
+    <string name="home_info_startanywhere_no">不支持</string>
+
+    <!-- SuperSys -->
+    <string name="supersys_title">超级系统</string>
+    <string name="supersys_show_system_apps">显示系统应用</string>
+    <string name="supersys_app_count">应用: %1$d</string>
+    <string name="supersys_search_hint">搜索应用…</string>
+    <string name="supersys_loading">正在加载应用列表…</string>
+
+    <!-- Log -->
+    <string name="log_title">日志</string>
+    <string name="log_clear">清除</string>
+    <string name="log_save">保存</string>
+    <string name="log_empty">暂无日志记录</string>
+    <string name="log_starting">正在启动日志监听…</string>
+    <string name="log_stopped">日志监听已停止</string>
+    <string name="log_error">无法读取 logcat，可能需要 READ_LOGS 权限</string>
+    <string name="log_saved">日志已保存</string>
+    <string name="log_save_failed">保存失败</string>
+    <string name="log_cleared">日志已清除</string>
+    <string name="log_notification_title">SuperSys 日志监听</string>
+    <string name="log_notification_text">正在实时读取系统日志</string>
+    <string name="log_channel_name">日志服务</string>
+    <string name="log_channel_desc">实时日志监听通知通道</string>
+
+    <!-- Accessibility -->
+    <string name="accessibility_service_desc">SuperSys 屏幕控制服务，用于熄屏操作</string>
+</resources>

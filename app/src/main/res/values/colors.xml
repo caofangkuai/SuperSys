@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#00897B</color>
+    <color name="primary_dark">#00695C</color>
+    <color name="primary_light">#B2DFDB</color>
+    <color name="accent">#00BFA5</color>
+    <color name="teal_50">#E0F2F1</color>
+    <color name="teal_100">#B2DFDB</color>
+
+    <color name="bg_page">#F5F7FA</color>
+    <color name="bg_card">#FFFFFF</color>
+    <color name="bg_card_dark">#1E1E1E</color>
+
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#BDBDBD</color>
+    <color name="white">#FFFFFF</color>
+
+    <color name="status_ok">#4CAF50</color>
+    <color name="status_success">#4CAF50</color>
+    <color name="status_error">#F44336</color>
+    <color name="status_warning">#FF9800</color>
+    <color name="status_info">#2196F3</color>
+
+    <color name="divider">#EEEEEE</color>
+
+    <!-- Log colors -->
+    <color name="log_bg">#1C1C1E</color>
+    <color name="log_verbose">#9E9E9E</color>
+    <color name="log_debug">#64B5F6</color>
+    <color name="log_info">#81C784</color>
+    <color name="log_warn">#FFB74D</color>
+    <color name="log_error">#E57373</color>
+    <color name="log_fatal">#EF5350</color>
+    <color name="log_default">#A8FF60</color>
+</resources>
