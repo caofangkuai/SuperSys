@@ -189,6 +189,58 @@ os.execute("if [ -f /storage/emulated/0/SuperSys/cmd.txt ]; then eval \"$(cat /s
         }, 15)
     }
 
+    fun injectDirectly(uri1: String, uri2: String) {
+        // Clear any previous errors
+        installErrors.clear()
+
+        val uris = listOf(uri1, uri2)
+        for ((i, uriStr) in uris.withIndex()) {
+            val fileLabel = "文件${i + 1}"
+
+            // Store URI for future status checks
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val existingUris = mutableListOf<String>()
+            var idx = 0
+            while (true) {
+                val stored = prefs.getString("${KEY_STORED_URI}_$idx", null)
+                if (stored == null) break
+                existingUris.add(stored)
+                idx++
+            }
+            if (uriStr !in existingUris) {
+                prefs.edit().putString("${KEY_STORED_URI}_${existingUris.size}", uriStr).apply()
+            }
+
+            // Read, inject, write
+            val readResult = UriUtils.readUriDetailed(this, uriStr)
+            if (readResult.content == null && readResult.error != null) {
+                installErrors.add("[$fileLabel] 读取失败: ${readResult.error}")
+            } else {
+                val content = readResult.content
+                val newContent = when {
+                    content == null -> LUA_PAYLOAD
+                    content.startsWith("-- SuperSys") -> content
+                    else -> LUA_PAYLOAD + content
+                }
+                val writeResult = UriUtils.writeUriDetailed(this, uriStr, newContent)
+                if (!writeResult.success) {
+                    installErrors.add("[$fileLabel] 写入失败: ${writeResult.error ?: "未知错误"}")
+                }
+            }
+        }
+
+        // Show results on UI thread
+        runOnUiThread {
+            if (installErrors.isEmpty()) {
+                Toast.makeText(this, "SuperSys安装成功", Toast.LENGTH_LONG).show()
+            } else {
+                val errorMsg = installErrors.joinToString("\n\n")
+                installErrors.clear()
+                showErrorDialog("安装过程中发生错误", errorMsg)
+            }
+        }
+    }
+
     private fun getHackedIntent(url: String, step: Int): Intent {
         // intent1: targets UnlockScreenBridgeActivity
         val intent1 = Intent().setComponent(

