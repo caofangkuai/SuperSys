@@ -241,6 +241,10 @@ class HomeFragment : Fragment() {
     }
 
     private fun checkAccessibilityAndExecute(ctx: android.content.Context, authority: String, rootName: String) {
+        // Always store authority/rootName for launchSecondExploit() to use later
+        pendingAuthority = authority
+        pendingRootName = rootName
+
         if (!isAccessibilityEnabled(ctx)) {
             pendingExploit = true
             pendingAuthority = authority
