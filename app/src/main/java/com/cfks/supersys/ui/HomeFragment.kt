@@ -168,7 +168,15 @@ class HomeFragment : Fragment() {
         // Step 2: Check persist.sys.audio_type
         val audioType = getSystemProperty("persist.sys.audio_type", "")
         if (audioType != "aispeech") {
-            showUnsupportedDialog("不支持的设备:需要persist.sys.audio_type为aispeech,当前[$audioType]")
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle("audio_type 不匹配")
+                .setMessage("不支持的设备:需要persist.sys.audio_type为aispeech,当前[$audioType]")
+                .setPositiveButton("跳过检查") { _, _ ->
+                    continueInstallCheck(ctx)
+                }
+                .setNegativeButton("取消", null)
+                .setCancelable(false)
+                .show()
             return
         }
 
@@ -199,6 +207,40 @@ class HomeFragment : Fragment() {
         }
 
         // Step 6: Check accessibility permission (auto-request if needed)
+        checkAccessibilityAndExecute(ctx, authority, rootName)
+    }
+
+    private fun continueInstallCheck(ctx: android.content.Context) {
+        // Step 3: Check if target package has UnlockScreenBridgeActivity
+        if (!isActivityExists(ctx, TARGET_PACKAGE, TARGET_ACTIVITY)) {
+            showUnsupportedDialog("不支持的设备:缺失UnlockScreenBridgeActivity")
+            return
+        }
+
+        // Step 4: Find a FileProvider with root-path in the target package
+        val rootPathInfo = findRootPathFileProvider(ctx, TARGET_PACKAGE)
+        if (rootPathInfo == null) {
+            showUnsupportedDialog("不支持的设备:缺失root-path FileProvider")
+            return
+        }
+
+        val authority = rootPathInfo.first
+        val rootName = rootPathInfo.second
+
+        // Step 5: Check if we already have URI permissions for both files
+        val uri1 = buildUriStr(authority, rootName, TARGET_FILE_PATHS[0])
+        val uri2 = buildUriStr(authority, rootName, TARGET_FILE_PATHS[1])
+
+        if (hasUriPermission(ctx, uri1) && hasUriPermission(ctx, uri2)) {
+            directInject(uri1, uri2)
+            return
+        }
+
+        // Step 6: Check accessibility permission (auto-request if needed)
+        checkAccessibilityAndExecute(ctx, authority, rootName)
+    }
+
+    private fun checkAccessibilityAndExecute(ctx: android.content.Context, authority: String, rootName: String) {
         if (!isAccessibilityEnabled(ctx)) {
             pendingExploit = true
             pendingAuthority = authority
@@ -222,7 +264,7 @@ class HomeFragment : Fragment() {
             return
         }
 
-        // Step 6: Lock screen then execute exploit
+        // Step 7: Lock screen then execute exploit
         executeExploit(authority, rootName)
     }
 
