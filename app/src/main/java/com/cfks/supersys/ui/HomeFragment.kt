@@ -72,7 +72,7 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         checkInstallStatus()
-        // Check if we were waiting for accessibility permission
+        // If we were waiting for accessibility permission and it's now enabled, show a prompt
         if (pendingExploit && isAccessibilityEnabled(requireContext())) {
             pendingExploit = false
             val authority = pendingAuthority
@@ -80,7 +80,12 @@ class HomeFragment : Fragment() {
             pendingAuthority = null
             pendingRootName = null
             if (authority != null) {
-                executeExploit(authority, rootName ?: "")
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("无障碍权限已开启")
+                    .setMessage("无障碍服务已启用，请再次点击安装按钮继续安装流程。")
+                    .setPositiveButton("知道了", null)
+                    .setCancelable(false)
+                    .show()
             }
         }
     }
@@ -252,7 +257,7 @@ class HomeFragment : Fragment() {
 
             MaterialAlertDialogBuilder(ctx)
                 .setTitle("需要无障碍权限")
-                .setMessage("SuperSys 需要无障碍权限来执行熄屏操作。\n请在设置中启用 SuperSys 的无障碍服务，返回后将自动继续。")
+                .setMessage("SuperSys 需要无障碍权限来执行熄屏操作。\n请在设置中启用 SuperSys 的无障碍服务，返回后请手动点击安装按钮继续。")
                 .setPositiveButton("去设置") { _, _ ->
                     val settingsIntent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
