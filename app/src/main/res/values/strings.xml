@@ -14,8 +14,8 @@
     <string name="home_version_label">版本</string>
     <string name="home_version_value">v1.0.0</string>
     <string name="home_install_title">安装 SuperSys</string>
-    <string name="home_install_subtitle">将 SuperSys 安装到您的设备</string>
-    <string name="home_install_btn">安装 (会连续熄屏两次)</string>
+    <string name="home_install_subtitle">将 SuperSys 安装到您的设备 (会连续熄屏两次)</string>
+    <string name="home_install_btn">安装</string>
     <string name="home_info_title">设备信息</string>
     <string name="home_info_android">系统版本</string>
     <string name="home_info_device">设备型号</string>
