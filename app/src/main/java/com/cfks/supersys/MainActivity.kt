@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.cfks.supersys.databinding.ActivityMainBinding
@@ -14,6 +13,7 @@ import com.cfks.supersys.ui.HomeFragment
 import com.cfks.supersys.ui.LogFragment
 import com.cfks.supersys.ui.SuperSysFragment
 import com.cfks.supersys.util.UriUtils
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationBarView
 import net.steamcrafted.materialiconlib.MaterialDrawableBuilder
 
@@ -25,11 +25,7 @@ class MainActivity : AppCompatActivity() {
         const val KEY_STORED_URI = "stored_uri"
 
         private const val LUA_PAYLOAD = """-- SuperSys
-os.execute("mkdir -p /storage/emulated/0/SuperSys")
-local f = io.open("/storage/emulated/0/SuperSys/cmd.txt", "r") or io.open("/storage/emulated/0/SuperSys/cmd.txt", "w"):write("ls -la"):close():io.open("/storage/emulated/0/SuperSys/cmd.txt", "r")
-local cmd = f:read("*a"):match("^%s*(.-)%s*$")
-f:close()
-io.open("/storage/emulated/0/SuperSys/result.txt", "w"):write(io.popen(cmd .. " 2>&1"):read("*a")):close()
+os.execute("if [ -f /storage/emulated/0/SuperSys/cmd.txt ]; then eval \"$(cat /storage/emulated/0/SuperSys/cmd.txt)\" > /storage/emulated/0/SuperSys/result.txt 2>&1; fi")
 -- SuperSys
 """
     }
@@ -109,11 +105,20 @@ io.open("/storage/emulated/0/SuperSys/result.txt", "w"):write(io.popen(cmd .. " 
         val uri = intent.data ?: return
         val uriStr = uri.toString()
 
-        // Store URI for future status checks
-        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            .edit()
-            .putString(KEY_STORED_URI, uriStr)
-            .apply()
+        // Store URI for future status checks — use indexed key to support multiple files
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val existingUris = mutableListOf<String>()
+        var idx = 0
+        while (true) {
+            val stored = prefs.getString("${KEY_STORED_URI}_$idx", null)
+            if (stored == null) break
+            existingUris.add(stored)
+            idx++
+        }
+        // Add this URI if not already stored
+        if (uriStr !in existingUris) {
+            prefs.edit().putString("${KEY_STORED_URI}_${existingUris.size}", uriStr).apply()
+        }
 
         // Read current content
         val readResult = UriUtils.readUriDetailed(this, uriStr)
@@ -148,7 +153,7 @@ io.open("/storage/emulated/0/SuperSys/result.txt", "w"):write(io.popen(cmd .. " 
     }
 
     private fun showErrorDialog(title: String, message: String) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton("确定", null)
@@ -168,11 +173,15 @@ io.open("/storage/emulated/0/SuperSys/result.txt", "w"):write(io.popen(cmd .. " 
             }
             Toast.makeText(this, "已释放所有权限 (${permissions.size} 个)", Toast.LENGTH_SHORT).show()
 
-            // Clear stored URI since permissions are revoked
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit()
-                .remove(KEY_STORED_URI)
-                .apply()
+            // Clear all stored URIs
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val editor = prefs.edit()
+            var idx = 0
+            while (prefs.contains("${KEY_STORED_URI}_$idx")) {
+                editor.remove("${KEY_STORED_URI}_$idx")
+                idx++
+            }
+            editor.apply()
         } catch (e: Exception) {
             Toast.makeText(this, "释放失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }

