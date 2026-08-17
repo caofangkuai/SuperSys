@@ -10,11 +10,14 @@ import android.os.FileObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import com.cfks.supersys.MainActivity
 import com.cfks.supersys.R
 import com.cfks.supersys.databinding.FragmentCommandBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -25,9 +28,7 @@ import java.io.IOException
 class CommandFragment : Fragment() {
 
     companion object {
-        private const val SUPERSYS_DIR = "/storage/emulated/0/SuperSys"
-        private const val CMD_FILE = "$SUPERSYS_DIR/cmd.txt"
-        private const val RESULT_FILE = "$SUPERSYS_DIR/result.txt"
+        private const val DEFAULT_CMD_TIMEOUT = 30
     }
 
     private var _binding: FragmentCommandBinding? = null
@@ -36,6 +37,16 @@ class CommandFragment : Fragment() {
     private var fileObserver: FileObserver? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var isExecuting = false
+    private var timeoutRunnable: Runnable? = null
+
+    private val supersysDir: String
+        get() = "${MainActivity.getSdcardPath(requireContext())}SuperSys"
+
+    private val cmdFile: String
+        get() = "$supersysDir/cmd.txt"
+
+    private val resultFile: String
+        get() = "$supersysDir/result.txt"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -65,15 +76,58 @@ class CommandFragment : Fragment() {
                 resetExecutingState()
             }
         }
+
+        setupTimeoutSetting()
     }
 
     override fun onResume() {
         super.onResume()
         try {
             updatePermissionStatus()
+            updateTimeoutDisplay()
         } catch (e: Exception) {
             // Ignore permission check errors
         }
+    }
+
+    private fun setupTimeoutSetting() {
+        val listener = View.OnClickListener { showTimeoutDialog() }
+        binding.btnTimeoutSet.setOnClickListener(listener)
+        binding.cardTimeoutSetting.setOnClickListener(listener)
+        updateTimeoutDisplay()
+    }
+
+    private fun updateTimeoutDisplay() {
+        val secs = MainActivity.getCmdTimeout(requireContext())
+        binding.tvTimeoutValue.text = "${secs}秒"
+    }
+
+    private fun showTimeoutDialog() {
+        val ctx = requireContext()
+        val current = MainActivity.getCmdTimeout(ctx)
+        val input = EditText(ctx).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = "超时秒数"
+            setText(current.toString())
+        }
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle("设置结果监听超时")
+            .setMessage("设置等待命令执行结果的超时时间（秒）")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val text = input.text?.toString()?.trim()
+                val secs = text?.toIntOrNull()
+                if (secs != null && secs > 0) {
+                    val prefs = ctx.getSharedPreferences(MainActivity.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putInt(MainActivity.KEY_CMD_TIMEOUT, secs).apply()
+                    updateTimeoutDisplay()
+                } else {
+                    Toast.makeText(ctx, "请输入有效的正整数", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun updatePermissionStatus() {
@@ -148,9 +202,9 @@ class CommandFragment : Fragment() {
 
         // Step 1: Create directory
         try {
-            val dir = File(SUPERSYS_DIR)
+            val dir = File(supersysDir)
             if (!dir.exists() && !dir.mkdirs()) {
-                showErrorDialog("创建目录失败", "无法创建目录: $SUPERSYS_DIR\n可能缺少存储权限")
+                showErrorDialog("创建目录失败", "无法创建目录: $supersysDir\n可能缺少存储权限")
                 resetExecutingState()
                 return
             }
@@ -166,8 +220,8 @@ class CommandFragment : Fragment() {
 
         // Step 2: Write command file
         try {
-            val cmdFile = File(CMD_FILE)
-            cmdFile.writeText(command)
+            val cmd = File(cmdFile)
+            cmd.writeText(command)
             binding.tvResult.text = "命令已写入，正在等待执行结果..."
         } catch (e: SecurityException) {
             showErrorDialog("写入命令文件被拒绝", e.toString())
@@ -220,16 +274,16 @@ class CommandFragment : Fragment() {
     private fun startResultObserver() {
         stopResultObserver()
 
-        val resultFile = File(RESULT_FILE)
+        val result = File(resultFile)
 
         // Delete old result file if exists
-        if (resultFile.exists()) {
-            resultFile.delete()
+        if (result.exists()) {
+            result.delete()
         }
 
         val mask = FileObserver.MODIFY or FileObserver.CLOSE_WRITE or FileObserver.CREATE
 
-        fileObserver = object : FileObserver(resultFile, mask) {
+        fileObserver = object : FileObserver(result, mask) {
             override fun onEvent(event: Int, path: String?) {
                 try {
                     stopWatching()
@@ -250,19 +304,24 @@ class CommandFragment : Fragment() {
         }
         fileObserver?.startWatching()
 
-        // Timeout: if no result in 30 seconds, show timeout message
-        mainHandler.postDelayed({
+        // Timeout: use user-configured timeout
+        val timeoutSecs = MainActivity.getCmdTimeout(requireContext())
+        val timeoutMs = timeoutSecs * 1000L
+        timeoutRunnable = Runnable {
             if (fileObserver != null && isExecuting) {
                 stopResultObserver()
                 if (_binding != null && isAdded) {
-                    binding.tvResult.text = "等待超时：30秒内未检测到结果文件变化\n可能目标应用未执行命令或Lua脚本未安装"
+                    binding.tvResult.text = "等待超时：${timeoutSecs}秒内未检测到结果文件变化\n可能目标应用未执行命令或Lua脚本未安装"
                     resetExecutingState()
                 }
             }
-        }, 30000)
+        }
+        mainHandler.postDelayed(timeoutRunnable!!, timeoutMs)
     }
 
     private fun stopResultObserver() {
+        timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        timeoutRunnable = null
         try {
             fileObserver?.stopWatching()
         } catch (e: Exception) {
@@ -273,9 +332,9 @@ class CommandFragment : Fragment() {
 
     private fun readAndDisplayResult() {
         try {
-            val resultFile = File(RESULT_FILE)
-            if (resultFile.exists()) {
-                val content = resultFile.readText()
+            val result = File(resultFile)
+            if (result.exists()) {
+                val content = result.readText()
                 if (_binding != null && isAdded) {
                     binding.tvResult.text = content
                     Toast.makeText(
